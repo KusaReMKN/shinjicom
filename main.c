@@ -214,10 +214,10 @@ init_lora(int fd)
 	struct termios term;
 
 	if (tcgetattr(fd, &term) == -1)
-		err(1, "tcgetattr");
+		err(EXIT_FAILURE, "tcgetattr");
 	cfmakeraw(&term);
 	if (tcsetattr(fd, TCSANOW, &term) == -1)
-		err(1, "tcsetattr");
+		err(EXIT_FAILURE, "tcsetattr");
 }
 
 /**
@@ -242,7 +242,7 @@ loop:
 	/* パケット長を読み込む（これは長さに含まれない） */
 	tmp = read(lorafd, rbuf, 1);
 	if (tmp == -1)
-		err(1, "read");
+		err(EXIT_FAILURE, "read");
 	psize = rbuf[0] & 0xFF;
 
 	/* パケットの全体を読み込む */
@@ -250,7 +250,7 @@ loop:
 	do {
 		tmp = read(lorafd, rbuf+nbyte+1, psize-nbyte);
 		if (tmp == -1)
-			err(1, "read");
+			err(EXIT_FAILURE, "read");
 		nbyte += tmp;
 	} while (nbyte < psize);
 	++nbyte;
@@ -267,7 +267,7 @@ loop:
 	/* とりあえず TUN に全て横流しする（XXX） */
 	rbuf[4] = rbuf[5] = 0;
 	if (write(tunfd, rbuf+4, nbyte-5) == -1)
-		err(1, "write");
+		err(EXIT_FAILURE, "write");
 
 	goto loop;
 	/* NOTREACHED */
@@ -299,7 +299,7 @@ loop:
 	/* パケットを読み出す */
 	nbyte = read(tunfd, rbuf, sizeof(rbuf));
 	if (nbyte == -1)
-		err(1, "read");
+		err(EXIT_FAILURE, "read");
 
 	/* とりあえず表示しておく */
 	(void)fprintf(stderr, "\nfrom TUN:");
@@ -337,7 +337,7 @@ loop:
 	(void)fprintf(stderr, "\n%04zx (%zd)\n", (size_t)nbyte, (size_t)nbyte);
 
 	if (write(lorafd, tbuf, (size_t)nbyte) == -1)
-		err(1, "write");
+		err(EXIT_FAILURE, "write");
 
 	/* パケット境界を示すために少し待つ */
 	(void)usleep(70000);
