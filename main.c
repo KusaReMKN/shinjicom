@@ -30,6 +30,7 @@
 #include <sys/ioctl.h>
 #include <sys/param.h>
 #include <sys/select.h>
+#include <sys/time.h>
 
 #include <net/ethernet.h>
 #include <net/if.h>
@@ -233,6 +234,7 @@ init_lora(int fd)
 static void *
 receiver(void *arg)
 {
+	struct timeval tv;
 	ssize_t nbyte, psize, tmp;
 	int lorafd, tunfd;
 	char rbuf[BUFLEN];
@@ -258,6 +260,9 @@ loop:
 	++nbyte;
 
 	/* とりあえず表示しておく */
+	(void)gettimeofday(&tv, NULL);
+	(void)fprintf(stderr, "\n%zu.%06zu, ",
+			(size_t)tv.tv_sec, (size_t)tv.tv_usec);
 	(void)fprintf(stderr, "\nfrom LoRa:");
 	for (ssize_t i = 0; i < nbyte; i++) {
 		if ((i & 0x0F) == 0x00)
@@ -288,6 +293,7 @@ loop:
 static void *
 transmitter(void *arg)
 {
+	struct timeval tv;
 	ssize_t nbyte;
 	int lorafd, tunfd;
 	char rbuf[BUFLEN], tbuf[BUFLEN];
@@ -331,6 +337,9 @@ loop:
 	tbuf[nbyte-1] = chksum;
 
 	/* とりあえず表示しておく */
+	(void)gettimeofday(&tv, NULL);
+	(void)fprintf(stderr, "\n%zu.%06zu, ",
+			(size_t)tv.tv_sec, (size_t)tv.tv_usec);
 	(void)fprintf(stderr, "\nto LoRa:");
 	for (ssize_t i = 0; i < nbyte; i++) {
 		if ((i & 0x0F) == 0x00)
