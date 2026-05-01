@@ -323,8 +323,16 @@ loop:
 
 	/* 真に自分宛でなければ TTL を減らして再送する */
 	if (destid != MYDEVID && --rbuf[3] > 0) {
-		/* TODO: ここでチェックサムを再計算する */
-		/* TODO: pipe に送信する */
+		/* 送信用ヘッダを用意する */
+		rbuf[0] = BRDID >> 8 & 0xFF;
+		rbuf[1] = BRDID      & 0xFF;	/* 宛先はブロードキャスト */
+		rbuf[2] = DEVCHAN;		/* 宛先は 7 ch */
+		/* チェックサムを再計算する */
+		rbuf[nbyte-1] = 0;
+		for (size_t i = 0; i < nbyte-1; i++)
+			rbuf[nbyte-1] ^= rbuf[i];
+		if (write(pipefd, rbuf, nbyte) == -1)
+			err(EXIT_FAILURE, "write");
 	}
 
 	/* パケット受信時刻を記録する */
