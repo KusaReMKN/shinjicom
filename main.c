@@ -440,7 +440,7 @@ submit:	/* とりあえず表示しておく */
 		err(EXIT_FAILURE, "write");
 
 	/* パケット境界を示すために少し待つ */
-	(void)usleep(70000);
+	(void)usleep(80000);
 
 	goto loop;
 	/* NOTREACHED */
