@@ -296,8 +296,10 @@ loop:
 static void *
 transmitter(void *arg)
 {
+	fd_set rfds;
 	ssize_t nbyte;
-	int lorafd, pipefd, tunfd;
+	int nfds, lorafd, pipefd, readfd, tunfd;
+	char *readfrom;
 	char rbuf[BUFLEN], tbuf[BUFLEN];
 	char chksum;
 
@@ -306,13 +308,30 @@ transmitter(void *arg)
 	tunfd = ((struct loratun *)arg)->tun;
 
 loop:
+	/* tun と pipe とを同時に監視する */
+	FD_ZERO(&rfds);
+	FD_SET(pipefd, &rfds);
+	FD_SET(tunfd, &rfds);
+	nfds = MAX(pipefd, tunfd) + 1;
+	if (select(nfds, &rfds, NULL, NULL, NULL) == -1)
+		err(EXIT_FAILURE, "select");
+
+	/* どこから読み出すのか分別する */
+	if (FD_ISSET(pipefd, &rfds)) {
+		readfd = pipefd;
+		readfrom = "PIPE";
+	} else {
+		readfd = tunfd;
+		readfrom = "TUN";
+	}
+
 	/* パケットを読み出す */
-	nbyte = read(tunfd, rbuf, sizeof(rbuf));
+	nbyte = read(readfd, rbuf, sizeof(rbuf));
 	if (nbyte == -1)
 		err(EXIT_FAILURE, "read");
 
 	/* とりあえず表示しておく */
-	(void)fprintf(stderr, "\nfrom TUN:");
+	(void)fprintf(stderr, "\nfrom %s:", readfrom);
 	for (ssize_t i = 0; i < nbyte; i++) {
 		if ((i & 0x0F) == 0x00)
 			(void)fprintf(stderr, "\n%#04zx:\t", (size_t)i);
