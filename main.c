@@ -50,6 +50,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <termios.h>
+#include <time.h>
 #include <unistd.h>
 
 #define IFNAME	"lora%d"
@@ -59,6 +60,7 @@
 
 #define DEVCHAN	0x07	/* デバイスチャンネル */
 #define BRDID	0xFFFF	/* ブロードキャスト識別子 */
+#define MYDEVID	0x0000	/* XXX: 自分のデバイス識別子 */
 
 #define MAXHOP	0x03	/* 最大ホップ回数 */
 
@@ -246,9 +248,12 @@ static void *
 receiver(void *arg)
 {
 	struct timeval tv;
+	static time_t recvat[256];
 	ssize_t nbyte, psize, tmp;
 	int lorafd, pipefd, tunfd;
+	uint16_t destid;
 	char rbuf[BUFLEN];
+	uint8_t frameid;
 
 	lorafd = ((struct loratun *)arg)->lora;
 	pipefd = ((struct loratun *)arg)->pipe[1];	/* 書き込み側 */
@@ -283,10 +288,47 @@ loop:
 	}
 	(void)fprintf(stderr, "\n%04zx (%zd)\n", (size_t)nbyte, (size_t)nbyte);
 
-	/* とりあえず TUN に全て横流しする（XXX） */
-	rbuf[4] = rbuf[5] = 0;
-	if (write(tunfd, rbuf+4, nbyte-5) == -1)
-		err(EXIT_FAILURE, "write");
+	/* 通常パケットであれば、そのまま受信する */
+	if (rbuf[6] != 'M' && rbuf[7] != 'H') {
+		/* とりあえず TUN に全て横流しする（XXX） */
+		rbuf[4] = rbuf[5] = 0;
+		if (write(tunfd, rbuf+4, nbyte-5) == -1)
+			err(EXIT_FAILURE, "write");
+		goto loop;
+	}
+
+	/* 直近でそのパケットを受信していれば捨てる */
+	frameid = rbuf[10];
+	if (time(NULL) - recvat[frameid] < 10) {
+		warnx("Discarded packet (%02x)", frameid);
+		goto loop;
+	}
+
+	/* デバイス識別子がブロードキャストか自分宛であれば受信する */
+	/* XXX: 現時点では全てブロードキャスト */
+	destid = rbuf[8] << 8 | rbuf[9];
+	if (destid == BRDID || destid == MYDEVID) {
+		/* とりあえず TUN に全て横流しする（XXX） */
+		rbuf[7] = rbuf[8] = 0;
+		rbuf[9] = rbuf[4];
+		rbuf[10] = rbuf[5];	/* EtherType */
+		if (write(tunfd, rbuf+7, nbyte-8) == -1)
+			err(EXIT_FAILURE, "write");
+		/* 壊した部分を書き戻す */
+		rbuf[7] = 'H';
+		rbuf[8] = destid >> 8 & 0xFF;
+		rbuf[9] = destid      & 0xFF;
+		rbuf[10] = frameid;
+	}
+
+	/* 真に自分宛でなければ TTL を減らして再送する */
+	if (destid != MYDEVID && --rbuf[3] > 0) {
+		/* TODO: ここでチェックサムを再計算する */
+		/* TODO: pipe に送信する */
+	}
+
+	/* パケット受信時刻を記録する */
+	recvat[frameid] = time(NULL);
 
 	goto loop;
 	/* NOTREACHED */
