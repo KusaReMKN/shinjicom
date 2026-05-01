@@ -49,11 +49,10 @@
 #include <termios.h>
 #include <unistd.h>
 
-#define ALIGN16(x)	((x + (16-1)) & ~(16-1))
-
 #define IFNAME	"lora%d"
 #define TUNPATH	"/dev/net/tun"
 #define LORAMTU	195
+#define BUFLEN	256	/* > LORAMTU + 11 */
 
 struct loratun {
 	int lora;
@@ -233,7 +232,7 @@ receiver(void *arg)
 {
 	ssize_t nbyte, psize, tmp;
 	int lorafd, tunfd;
-	char rbuf[ALIGN16(LORAMTU+9)];
+	char rbuf[BUFLEN];
 
 	lorafd = ((struct loratun *)arg)->lora;
 	tunfd = ((struct loratun *)arg)->tun;
@@ -288,8 +287,7 @@ transmitter(void *arg)
 {
 	ssize_t nbyte;
 	int lorafd, tunfd;
-	char rbuf[ALIGN16(LORAMTU+sizeof(struct tun_pi))];
-	char tbuf[ALIGN16(LORAMTU+9)];
+	char rbuf[BUFLEN], tbuf[BUFLEN];
 	char chksum;
 
 	lorafd = ((struct loratun *)arg)->lora;
