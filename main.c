@@ -54,11 +54,13 @@
 
 #define IFNAME	"lora%d"
 #define TUNPATH	"/dev/net/tun"
-#define LORAMTU	195
+#define LORAMTU	192
 #define BUFLEN	256	/* > LORAMTU + 11 */
 
 #define DEVCHAN	0x07	/* デバイスチャンネル */
 #define BRDID	0xFFFF	/* ブロードキャスト識別子 */
+
+#define MAXHOP	0x03	/* 最大ホップ回数 */
 
 struct loratun {
 	int lora;
@@ -73,6 +75,8 @@ static void usage(void);
 static void *receiver(void *arg);
 static void *transmitter(void *arg);
 static int tun_alloc(char *ifname);
+
+static uint16_t mydevid;
 
 int
 main(int argc, char *argv[])
@@ -333,17 +337,23 @@ loop:
 	tbuf[0] = BRDID >> 8 & 0xFF;
 	tbuf[1] = BRDID      & 0xFF;	/* 宛先はブロードキャスト */
 	tbuf[2] = DEVCHAN;		/* 宛先は 7 ch */
-	tbuf[3] = BRDID >> 8 & 0xFF;
-	tbuf[4] = BRDID      & 0xFF;	/* 送信元もブロードキャスト（？） */
-	tbuf[5] = DEVCHAN;		/* 送信元は 7 ch */
-	for (ssize_t i = 0; i < nbyte-2; i++)
-		tbuf[6+i] = rbuf[2+i];
-	nbyte += 5;		/* - sizeof(pi) + 9 */
+	tbuf[3] = MAXHOP;		/* 最大ホップ数は 3 */
+	tbuf[4] = rbuf[2];
+	tbuf[5] = rbuf[3];		/* L3 プロトコル */
+	tbuf[6] = 'M';
+	tbuf[7] = 'H';			/* マルチホップパケット */
+	tbuf[8] = BRDID >> 8 & 0xFF;
+	tbuf[9] = BRDID      & 0xFF;	/* 宛先デバイスはブロードキャスト */
+	tbuf[10] = 0x00;		/* パケット ID はとりあえず 0 */
+	for (ssize_t i = 0; i < nbyte-4; i++)
+		tbuf[11+i] = rbuf[4+i];
+	nbyte += 8;		/* - sizeof(pi) + 9 */
 	/* チェックサム計算 */
 	chksum = 0;
 	for (ssize_t i = 0; i < nbyte-1; i++)
 		chksum ^= tbuf[i];
-	tbuf[nbyte-1] = chksum;
+	tbuf[10] = chksum;
+	tbuf[nbyte-1] = 0;
 
 	/* とりあえず表示しておく */
 	(void)gettimeofday(&tv, NULL);
