@@ -27,6 +27,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define _GNU_SOURCE	/* for pipe2() */
+
 #include <sys/ioctl.h>
 #include <sys/param.h>
 #include <sys/select.h>
@@ -61,6 +63,7 @@
 struct loratun {
 	int lora;
 	int tun;
+	int pipe[2];
 };
 
 static void init_interface(const char *ifname, int mtu, const char *cidr);
@@ -93,6 +96,10 @@ main(int argc, char *argv[])
 	if (tunfd == -1)
 		err(EXIT_FAILURE, "tun_alloc");
 	init_interface(ifname, LORAMTU, argv[2]);
+
+	/* 自分と通信するためのパイプを準備する */
+	if (pipe2(lt.pipe, O_DIRECT) == -1)
+		err(EXIT_FAILURE, "pipe2");
 
 	/* 受信用スレッドを起動する */
 	lt.lora = lorafd;
@@ -236,10 +243,11 @@ receiver(void *arg)
 {
 	struct timeval tv;
 	ssize_t nbyte, psize, tmp;
-	int lorafd, tunfd;
+	int lorafd, pipefd, tunfd;
 	char rbuf[BUFLEN];
 
 	lorafd = ((struct loratun *)arg)->lora;
+	pipefd = ((struct loratun *)arg)->pipe[1];	/* 書き込み側 */
 	tunfd = ((struct loratun *)arg)->tun;
 
 loop:
@@ -295,11 +303,12 @@ transmitter(void *arg)
 {
 	struct timeval tv;
 	ssize_t nbyte;
-	int lorafd, tunfd;
+	int lorafd, pipefd, tunfd;
 	char rbuf[BUFLEN], tbuf[BUFLEN];
 	char chksum;
 
 	lorafd = ((struct loratun *)arg)->lora;
+	pipefd = ((struct loratun *)arg)->pipe[0];	/* 読み出し側 */
 	tunfd = ((struct loratun *)arg)->tun;
 
 loop:
