@@ -247,8 +247,8 @@ init_lora(int fd)
 static void *
 receiver(void *arg)
 {
-	struct timeval tv;
 	static time_t recvat[256];
+	struct timeval tv;
 	ssize_t nbyte, psize, tmp;
 	int lorafd, pipefd, tunfd;
 	uint16_t destid;
