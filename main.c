@@ -54,6 +54,9 @@
 #define LORAMTU	195
 #define BUFLEN	256	/* > LORAMTU + 11 */
 
+#define DEVCHAN	0x07	/* デバイスチャンネル */
+#define BRDID	0xFFFF	/* ブロードキャスト識別子 */
+
 struct loratun {
 	int lora;
 	int tun;
@@ -312,10 +315,12 @@ loop:
 	/* ARP の結果 IPv4 以外は通れなくなるんだけど、よくわからない */
 
 	/* とりあえす LoRa に全て横流しする（XXX） */
-	tbuf[0] = tbuf[1] = 0xFF;	/* 宛先はブロードキャスト */
-	tbuf[2] = 0x07;			/* 宛先は 7 ch */
-	tbuf[3] = tbuf[4] = 0xFF;	/* 送信元もブロードキャスト（？） */
-	tbuf[5] = 0x07;			/* 送信元は 7 ch */
+	tbuf[0] = BRDID >> 8 & 0xFF;
+	tbuf[1] = BRDID      & 0xFF;	/* 宛先はブロードキャスト */
+	tbuf[2] = DEVCHAN;		/* 宛先は 7 ch */
+	tbuf[3] = BRDID >> 8 & 0xFF;
+	tbuf[4] = BRDID      & 0xFF;	/* 送信元もブロードキャスト（？） */
+	tbuf[5] = DEVCHAN;		/* 送信元は 7 ch */
 	for (ssize_t i = 0; i < nbyte-2; i++)
 		tbuf[6+i] = rbuf[2+i];
 	nbyte += 5;		/* - sizeof(pi) + 9 */
