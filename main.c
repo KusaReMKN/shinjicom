@@ -348,8 +348,9 @@ static void *
 transmitter(void *arg)
 {
 	struct timeval tv;
+	fd_set rfds;
 	ssize_t nbyte;
-	int lorafd, pipefd, tunfd;
+	int lorafd, nfds, pipefd, tunfd;
 	char rbuf[BUFLEN], tbuf[BUFLEN];
 	char chksum;
 
@@ -358,6 +359,23 @@ transmitter(void *arg)
 	tunfd = ((struct loratun *)arg)->tun;
 
 loop:
+	/* TUN と PIPE とを同時に監視する */
+	FD_ZERO(&rfds);
+	FD_SET(pipefd, &rfds);
+	FD_SET(tunfd, &rfds);
+	nfds = MAX(pipefd, tunfd) + 1;
+	if (select(nfds, &rfds, NULL, NULL, NULL) == -1)
+		err(EXIT_FAILURE, "select");
+
+	/* PIPE からの読み込みなら全てを LoRa に投げる */
+	if (FD_ISSET(pipefd, &rfds)) {
+		nbyte = read(pipefd, tbuf, sizeof(tbuf));
+		if (nbyte == -1)
+			err(EXIT_FAILURE, "read");
+		goto submit;
+	}
+	/* 以降 TUN のみ */
+
 	/* パケットを読み出す */
 	nbyte = read(tunfd, rbuf, sizeof(rbuf));
 	if (nbyte == -1)
@@ -397,7 +415,7 @@ loop:
 	tbuf[10] = chksum;
 	tbuf[nbyte-1] = 0;
 
-	/* とりあえず表示しておく */
+submit:	/* とりあえず表示しておく */
 	(void)gettimeofday(&tv, NULL);
 	(void)fprintf(stderr, "\n%zu.%06zu, ",
 			(size_t)tv.tv_sec, (size_t)tv.tv_usec);
@@ -409,6 +427,7 @@ loop:
 	}
 	(void)fprintf(stderr, "\n%04zx (%zd)\n", (size_t)nbyte, (size_t)nbyte);
 
+	/* TUN も PIPE もここで送信される */
 	if (write(lorafd, tbuf, (size_t)nbyte) == -1)
 		err(EXIT_FAILURE, "write");
 
