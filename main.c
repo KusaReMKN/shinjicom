@@ -309,13 +309,13 @@ loop:
 		err(EXIT_FAILURE, "read");
 
 	/* とりあえず表示しておく */
-	(void)fprintf(stderr, "\nfrom TUN:");
-	for (ssize_t i = 0; i < nbyte; i++) {
-		if ((i & 0x0F) == 0x00)
-			(void)fprintf(stderr, "\n%#04zx:\t", (size_t)i);
-		(void)fprintf(stderr, "%02x ", (unsigned)rbuf[i] & 0xFF);
-	}
-	(void)fprintf(stderr, "\n%04zx (%zd)\n", (size_t)nbyte, (size_t)nbyte);
+//	(void)fprintf(stderr, "\nfrom TUN:");
+//	for (ssize_t i = 0; i < nbyte; i++) {
+//		if ((i & 0x0F) == 0x00)
+//			(void)fprintf(stderr, "\n%#04zx:\t", (size_t)i);
+//		(void)fprintf(stderr, "%02x ", (unsigned)rbuf[i] & 0xFF);
+//	}
+//	(void)fprintf(stderr, "\n%04zx (%zd)\n", (size_t)nbyte, (size_t)nbyte);
 
 	/* 本来であればここで ARP する（XXX） */
 	/* ARP の結果 IPv4 以外は通れなくなるんだけど、よくわからない */
